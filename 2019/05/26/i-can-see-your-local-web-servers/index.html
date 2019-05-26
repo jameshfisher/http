@@ -1,0 +1,281 @@
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <meta name="theme-color" content="white"/>
+    <meta name="keywords" content="programming, security"/>
+    <meta property="og:title" content="I can see your local web servers"/>
+    <meta property="og:type" content="website"/>
+    <meta property="og:image" content="http://localhost:4000/assets/jim_512.jpg"/>
+    <meta property="og:url" content="https://jameshfisher.com/2019/05/26/i-can-see-your-local-web-servers/"/>
+    <meta property="og:description" content="How many web servers are running on your machine right now? Do all of those development web servers have a secure login, and restrictive CORS permissions? You don’t know? Allow me to check for you:  "/>
+    <meta property="og:site_name" content="jameshfisher.com"/>
+    
+    <link rel="canonical" href="https://jameshfisher.com/2019/05/26/i-can-see-your-local-web-servers/"/>
+    <link rel="icon" type="image/png" href="http://localhost:4000/assets/jim_128.png" />
+    <link rel="manifest" href="/manifest.json"/>
+    <link rel="alternate" type="application/rss+xml" href="https://jameshfisher.com/feed.xml" />
+    <title>I can see your local web servers</title>
+    <style type="text/css">
+body { margin: 0 1em; font-family: sans-serif; }
+#content { max-width: 50em; margin: 2em auto; }
+* { font-size: 18px; line-height: 1.6em; box-sizing: border-box; }
+code, .highlight { background: #eee; }
+td, th { text-align: left; padding-right: 1em; vertical-align: top; }
+.highlight .n, .highlight .nf, .highlight .nv { text-decoration: underline; }
+.language-diff .highlight .gi { color: #22863a; background-color: #f0fff4; }
+.language-diff .highlight .gd { color: #b31d28; background-color: #ffeef0; }
+a:link, a:visited { text-decoration: none; }
+.date { font-size: 0.7em; }
+.jim_image { display: block; box-shadow: 2px 2px 10px #ccc; }
+blockquote { border-left: 2px solid black; margin-left: 0; padding-left: 1rem; }
+p > img, p > a > img { border: 2px solid black; width: 100%; }
+.answer {
+  border-color: #8ec58e;
+  padding: 0 0.3rem;
+  border-radius: 3px; border: 2px solid #8585d0;
+}
+.answer:not(.revealed) {
+  color: rgba(0,0,0,0);
+  background-image: url(/assets/question-mark.svg);
+  cursor: pointer;
+}
+.answer:not(.revealed) * {
+  opacity: 0;
+}
+.aside {
+  float: right;
+  max-width: 400px;
+  margin: 0 0 0 1em;
+}
+sup, sub { font-size: 0.8em; vertical-align: baseline; position: relative; top: -0.4em; }
+sub { top: 0.4em; }
+small { font-size: smaller; }
+</style>
+
+  </head>
+  <body>
+    <div id="content">
+      <h1>I can see your local web servers
+</h1>
+      
+      
+      <p>How many web servers are running on your machine right now?
+Do all of those development web servers have a secure login,
+and restrictive CORS permissions?
+You don’t know?
+Allow me to check for you:</p>
+
+<p id="local_checklist" class="checklist">
+</p>
+
+<p>If you see any results like <span class="result bad">localhost:3000 is available!</span>,
+you should secure whatever you have running on that port,
+because all websites you visit have access to it - 
+including the page you’re reading!
+It is not sufficient security to only bind to <code class="highlighter-rouge">127.0.0.1</code> (the “loopback interface”),
+because there are untrusted programs running on your machine right now
+that have access to the loopback interface.
+Those untrusted programs are web pages!</p>
+
+<p>The mistake is easily made.
+Here’s an example vulnerable app,
+using <a href="https://expressjs.com/">Express</a>,
+a popular web framework:</p>
+
+<div class="language-js highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">const</span> <span class="nx">express</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">'express'</span><span class="p">);</span>
+<span class="kd">const</span> <span class="nx">cors</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">'cors'</span><span class="p">);</span>
+<span class="kd">const</span> <span class="nx">app</span> <span class="o">=</span> <span class="nx">express</span><span class="p">();</span>
+<span class="nx">app</span><span class="p">.</span><span class="nx">use</span><span class="p">(</span><span class="nx">cors</span><span class="p">());</span>
+<span class="nx">app</span><span class="p">.</span><span class="kd">get</span><span class="p">(</span><span class="s1">'/'</span><span class="p">,</span> <span class="p">(</span><span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">)</span> <span class="o">=&gt;</span> 
+  <span class="nx">res</span><span class="p">.</span><span class="nx">send</span><span class="p">(</span><span class="s1">'My personal admin site'</span><span class="p">));</span>
+<span class="nx">app</span><span class="p">.</span><span class="nx">listen</span><span class="p">(</span><span class="mi">3000</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>To make things worse,
+many servers bind to <code class="highlighter-rouge">0.0.0.0</code>,
+meaning the server is available from anywhere that can reach the machine.
+For example, Express does this by default!
+If you’re at work right now,
+you might have dozens of other employees on your local network.
+We can scan for all of their exposed servers, too:</p>
+
+<p id="network_checklist" class="checklist">
+</p>
+
+<p>If you see any results like <span class="result bad">192.168.0.4:3000 is available!</span>,
+you should tell your colleague to secure whatever she has running on that port,
+because it is accessible by all websites visited by all your colleagues!
+It is not sufficient security to hide behind a NAT (e.g. your WiFi router),
+because there are untrusted programs running on your network right now
+that have access to every machine - 
+again, those untrusted programs are web pages!</p>
+
+<style>
+  span.result.bad { color: red; font-weight: bold; }
+  span.result.bad a:link, span.result.bad a:visited { color: red; text-decoration: underline; }
+  .checklist { background-color: yellow; max-height: 6em; overflow-y: scroll; }
+</style>
+
+<script>
+  const localChecklist = document.getElementById("local_checklist");
+  const networkChecklist = document.getElementById("network_checklist");
+  const portsToTry = [
+    80, 81, 88,
+    3000, 3001, 3030, 3031, 3333,
+    4000, 4001, 4040, 4041, 4444,
+    5000, 5001, 5050, 5051, 5555,
+    6000, 6001, 6060, 6061, 6666,
+    7000, 7001, 7070, 7071, 7777,
+    8000, 8001, 8080, 8081, 8888,
+    9000, 9001, 9090, 9091, 9999,
+  ];
+
+  function logLine(checklist, text, className) {
+    const span = document.createElement("span");
+    span.innerHTML = text + " ";
+    span.setAttribute("class", "result" + " " + className);
+    checklist.appendChild(span);
+    checklist.scrollTop = checklist.scrollHeight;
+  }
+
+  function timeoutPromise(ms, promise) {
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error("TIMEOUT"));
+      }, ms);
+      promise.then(
+        res => {
+          clearTimeout(timeoutId);
+          resolve(res);
+        },
+        err => {
+          clearTimeout(timeoutId);
+          reject(err);
+        }
+      );
+    })
+  }
+
+  function getLocalNetworkPrefix(cb) {
+    var RTCPeerConnection = window.RTCPeerConnection || webkitRTCPeerConnection || mozRTCPeerConnection;
+    var peerConn = new RTCPeerConnection({'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]});
+    var dataChannel = peerConn.createDataChannel('test');  // Needs something added for some reason
+    peerConn.createOffer({}).then((desc) => peerConn.setLocalDescription(desc));
+    peerConn.onicecandidate = (e) => {
+      if (e.candidate == null) {
+        cb(/(192\.168\.[0-9]+\.)[0-9]+/.exec(peerConn.localDescription.sdp)[1]);
+      }
+    };
+  }
+
+  function scanHost(hostname, checklist, cb) {
+    logLine(checklist, `Scanning ${hostname} ...`, "");
+    function loop(portIndex) {
+      if (portIndex >= portsToTry.length) {
+        logLine(checklist, `${hostname} complete.`, "");
+        cb();
+      } else {
+        const port = portsToTry[portIndex];
+        const url = `http://${hostname}:${port}`;
+        timeoutPromise(2000, fetch(url)).then(
+          response => {
+            logLine(checklist, `<a href="http://${hostname}:${port}" target="_blank">${hostname}:${port}</a> is available!`, "bad");
+            loop(portIndex+1);
+          },
+          e => {
+            if (e.message == "TIMEOUT") {
+              // Assume this host is unreachable. Don't waste time; go to the next host.
+              logLine(checklist, `unreachable.`, "");
+              cb();
+            } else {
+              loop(portIndex+1);
+            }
+          }
+        );
+      }
+    }
+    loop(0);
+  }
+
+  function scanNetwork(localNetworkPrefix) {
+    logLine(networkChecklist, "Scanning network ...", "");
+    function loop(lowByte) {
+      if (lowByte > 255) {
+        logLine(networkChecklist, `Network scan complete.`, "");
+      } else {
+        const hostname = localNetworkPrefix + lowByte;
+        scanHost(hostname, networkChecklist, () => {
+          loop(lowByte+1);
+        });
+      }
+    }
+    loop(1);
+  }
+
+  scanHost("localhost", localChecklist, () => {
+    getLocalNetworkPrefix(prefix => {
+      scanNetwork(prefix);
+    })
+  });
+</script>
+
+
+      <p style="text-align: center">
+        <a target="_blank" style="display: inline-block; padding: 4px 10px; margin: 2em auto; background-color: #1b95e0; color: #fff; cursor: pointer;" href="https://twitter.com/intent/follow?screen_name=MrJamesFisher&original_referer=https://jameshfisher.com/2019/05/26/i-can-see-your-local-web-servers/">
+          Get updates on Twitter
+        </a>
+      </p>
+      <hr/>
+      <h3>More by Jim</h3>
+      <p class="posts">
+        <ul>
+          <li><a class="post" href="/2019/04/27/the-inception-bar-a-new-phishing-method/">The inception bar: a new phishing method</a></li><li><a class="post" href="/2019/03/23/the-hacker-hype-cycle/">The hacker hype cycle</a></li><li><a class="post" href="/2019/02/16/project-c-43-the-lost-origins-of-asymmetric-crypto/">Project C-43: the lost origins of asymmetric crypto</a></li><li><a class="post" href="/2019/01/26/how-hacker-news-stays-interesting/">How Hacker News stays interesting</a></li><li><a class="post" href="/2019/01/20/my-parents-are-flat-earthers/">My parents are Flat-Earthers</a></li><li><a class="post" href="/2018/04/07/the-dots-do-matter-how-to-scam-a-gmail-user/">The dots do matter: how to scam a Gmail user</a></li><li><a class="post" href="/2017/12/02/the-sorry-state-of-openssl-usability/">The sorry state of OpenSSL usability</a></li><li><a class="post" href="/2017/11/08/i-hate-telephones/">I hate telephones</a></li><li><a class="post" href="/2017/10/26/time-thought-and-typing/">The Three Ts of Time, Thought and Typing: measuring cost on the web</a></li><li><a class="post" href="/2017/05/19/granddad-died-today/">Granddad died today</a></li><li><a class="post" href="/2014/05/11/your-syntax-highlighter-is-wrong/">Your syntax highlighter is wrong</a></li>
+        </ul>
+      </p>
+      <p>
+        Tagged <a class="post" href="/tag/programming">#programming</a>, <a class="post" href="/tag/security">#security</a>.
+        
+          All content copyright James Fisher 2019.
+          This post is not associated with my employer.
+        
+        <a href="https://github.com/jameshfisher/jameshfisher.com/edit/master/_posts/2019-05-26-i-can-see-your-local-web-servers.md">Found an error? Edit this page.</a>
+      </p>
+      <style>
+.navbar { display: flex; margin: 1em 0; }
+.navbar .navbar-item { flex-grow: 1; text-align: center; }
+</style>
+<div class="navbar">
+  <div class="navbar-item"><a href="/">Jim Fisher</a></div>
+  <div class="navbar-item"><a href="/speaking/">Speaking</a></div>
+  <div class="navbar-item"><a href="/blogroll/">Blogroll</a></div>
+  <div class="navbar-item"><a href="https://vidr.io">Vidrio</a></div>
+  <div class="navbar-item"><a href="https://jameshfisher.com/feed.xml">RSS</a></div>
+</div>
+
+    </div>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-90722538-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+    <script>
+    if (window.navigator && window.navigator.serviceWorker) {
+      window.navigator.serviceWorker.register("/service-worker.js");
+    }
+    </script>
+    <script>
+    document.addEventListener("DOMContentLoaded", () =>
+      Array.prototype.forEach.call(
+        document.getElementsByClassName("answer"),
+        el => el.addEventListener("click", () => el.classList.add("revealed"))));
+    </script>
+  </body>
+</html>
+
