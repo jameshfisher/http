@@ -159,14 +159,50 @@ again, those untrusted programs are web pages!</p>
     })
   }
 
+  function extractLocalNetworkPrefix(candidate) {
+    if (!candidate)
+      return null;
+
+    // Class A
+    var candidatePrefix = /(^10\.[0-9]{1,3}\.[0-9]{1,3}\.)[0-9]{1,3}/.exec(candidate);
+    if (candidatePrefix && candidatePrefix.length > 1)
+      return candidatePrefix[1];
+
+    // Class B
+    candidatePrefix = /(^172\.1[6-9]\.[0-9]{1,3}\.)[0-9]{1,3}/.exec(candidate);
+    if (candidatePrefix && candidatePrefix.length > 1)
+      return candidatePrefix[1];
+
+    candidatePrefix = /(^172\.2[0-9]\.[0-9]{1,3}\.)[0-9]{1,3}/.exec(candidate);
+    if (candidatePrefix && candidatePrefix.length > 1)
+      return candidatePrefix[1];
+
+    var candidatePrefix = /(^172\.3[0-1]\.[0-9]{1,3}\.)[0-9]/.exec(candidate);
+    if (candidatePrefix && candidatePrefix.length > 1)
+      return candidatePrefix[1];
+
+    // Class C
+    var candidatePrefix = /(^192\.168\.[0-9]{1,3}\.)[0-9]{1,3}/.exec(candidate);
+    if (candidatePrefix && candidatePrefix.length > 1)
+      return candidatePrefix[1];
+
+    return null;
+  }
+
   function getLocalNetworkPrefix(cb) {
     var RTCPeerConnection = window.RTCPeerConnection || webkitRTCPeerConnection || mozRTCPeerConnection;
     var peerConn = new RTCPeerConnection({'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]});
     var dataChannel = peerConn.createDataChannel('test');  // Needs something added for some reason
     peerConn.createOffer({}).then((desc) => peerConn.setLocalDescription(desc));
     peerConn.onicecandidate = (e) => {
-      if (e.candidate == null) {
-        cb(/(192\.168\.[0-9]+\.)[0-9]+/.exec(peerConn.localDescription.sdp)[1]);
+      if (!e.candidate) {
+        var prefix = extractLocalNetworkPrefix(peerConn.localDescription.sdp);
+        if (prefix)
+          cb(prefix);
+      } else if (e.candidate.address) {
+        var prefix = extractLocalNetworkPrefix(e.candidate.address);
+        if (prefix)
+          cb(prefix);
       }
     };
   }
